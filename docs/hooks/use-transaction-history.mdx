@@ -8,9 +8,10 @@ date: 2026-06-02
 
 The `useTransactionHistory` hook fetches and paginates a Stellar account's operation or payment history from Horizon, using cursor-based pagination.
 
-<Note type="info">
-  This hook ships in the `default` and `js` templates. It is not currently included in the
-  `minimal` or `defi` templates.
+<Note>
+  **Ships in:** every template (default, js, minimal, defi)
+  <br />
+  Removed it from your scaffold? Restore it with `nextellar add history`
 </Note>
 
 ## Features
@@ -26,11 +27,13 @@ The `useTransactionHistory` hook fetches and paginates a Stellar account's opera
 ```tsx
 import { useTransactionHistory } from '@/hooks/useTransactionHistory';
 
-export default function TransactionHistoryList({ publicKey }: { publicKey?: string }) {
-  const { items, loading, error, fetchNextPage, hasMore, refresh } = useTransactionHistory(
-    publicKey,
-    { pageSize: 20, type: 'payments' }
-  );
+export default function TransactionHistoryList({
+  publicKey,
+}: {
+  publicKey?: string;
+}) {
+  const { items, loading, error, fetchNextPage, hasMore, refresh } =
+    useTransactionHistory(publicKey, { pageSize: 20, type: 'payments' });
 
   if (loading && items.length === 0) return <div>Loading...</div>;
   if (error) {
@@ -71,12 +74,12 @@ useTransactionHistory(
 ): TransactionHistoryState
 ```
 
-| Parameter    | Type                          | Default                       | Description                                                          |
-| ------------ | ----------------------------- | ------------------------------ | --------------------------------------------------------------------- |
-| `publicKey`  | `string \| null`               | none                            | Account to fetch history for. While omitted, `items` stays empty.    |
-| `horizonUrl` | `string`                       | Provider's `horizonUrl`, else Testnet | Horizon endpoint to query.                                     |
-| `pageSize`   | `number`                       | `10`                            | Records requested per page.                                          |
-| `type`       | `'payments' \| 'operations'`   | `'operations'`                  | Fetch payment-only records or all account operations.                |
+| Parameter    | Type                         | Default                               | Description                                                       |
+| ------------ | ---------------------------- | ------------------------------------- | ----------------------------------------------------------------- |
+| `publicKey`  | `string \| null`             | none                                  | Account to fetch history for. While omitted, `items` stays empty. |
+| `horizonUrl` | `string`                     | Provider's `horizonUrl`, else Testnet | Horizon endpoint to query.                                        |
+| `pageSize`   | `number`                     | `10`                                  | Records requested per page.                                       |
+| `type`       | `'payments' \| 'operations'` | `'operations'`                        | Fetch payment-only records or all account operations.             |
 
 ### Return Value
 
@@ -93,12 +96,60 @@ interface TransactionHistoryState {
 
 `OperationItem` is `Horizon.ServerApi.OperationRecord` from `@stellar/stellar-sdk` — each item is an operation (or payment) record with fields like `id`, `type`, `created_at`, `paging_token`, and, for payments, `amount`, `asset_type`, `from`, and `to`.
 
-- `fetchNextPage()` requests the next page after the current cursor and appends the results to `items`.
-- `refresh()` restarts pagination from the beginning and replaces `items` with the first page.
+- `fetchNextPage()` requests the next page after the current cursor and appends the results to `items`. Records already present are de-duplicated (matched by `paging_token`, falling back to `id`), so a record on a page boundary never renders twice. It returns immediately without fetching when `hasMore` is `false` or no cursor is available.
+- `refresh()` resets the cursor and replaces `items` with the first page. Previous items are kept in place if the request fails.
 - `hasMore` is `true` only when the most recent page returned a full `pageSize` of records **and** Horizon returned a next cursor; it becomes `false` once a shorter (final) page is reached.
+- Changing `publicKey` (or any option: `type`, `pageSize`, `horizonUrl`) resets the cursor and reloads from the first page.
+- At most 1000 records are kept in memory; once exceeded, the oldest entries are trimmed first.
 - Records are always returned newest first; there is no configurable sort order.
 
 ## Examples
+
+### Pagination
+
+Render the current page and let the user request the next cursor only when Horizon reports that more records are available:
+
+```tsx
+import { useTransactionHistory } from '@/hooks/useTransactionHistory';
+
+export function PaginatedHistory({ publicKey }: { publicKey?: string }) {
+  const { items, loading, error, fetchNextPage, hasMore, refresh } =
+    useTransactionHistory(publicKey, { pageSize: 20, type: 'payments' });
+
+  if (error) {
+    return (
+      <div>
+        <p role="alert">Unable to load transactions: {error.message}</p>
+        <button type="button" onClick={() => void refresh()}>
+          Try again
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <section>
+      <ul>
+        {items.map((item) => (
+          <li key={item.id}>
+            {item.type} - {new Date(item.created_at).toLocaleString()}
+          </li>
+        ))}
+      </ul>
+      {hasMore && (
+        <button
+          type="button"
+          onClick={() => void fetchNextPage()}
+          disabled={loading}
+        >
+          {loading ? 'Loading...' : 'Load more'}
+        </button>
+      )}
+      {!loading && items.length === 0 && <p>No transactions found.</p>}
+    </section>
+  );
+}
+```
 
 ### Filter by Record Type
 
@@ -176,3 +227,4 @@ if (error) {
 
 - [`useStellarWallet`](/docs/hooks/use-stellar-wallet) - Send transactions
 - [`useStellarPayment`](/docs/hooks/use-stellar-payment) - Build transactions
+- [`useOfferBook`](/docs/hooks/use-offer-book) - Query DEX activity

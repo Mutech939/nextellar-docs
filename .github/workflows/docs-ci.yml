@@ -663,6 +663,8 @@ jobs:
           fi
           if [ "${{ needs.test-a11y.result }}" != "success" ]; then
             echo "❌ Accessibility testing failed"
+            exit 1
+          fi
           if [ "${{ needs.spellcheck.result }}" != "success" ]; then
             echo "❌ Spellcheck failed"
             exit 1

@@ -17,12 +17,12 @@ const guideFrontmatterFields = {
   description: { type: 'string', required: false },
   date: { type: 'date', required: false },
   tags: { type: 'list', of: { type: 'string' }, required: false },
-} satisfies Record<keyof GuideFrontmatter, unknown>;
+} as const satisfies Record<keyof GuideFrontmatter, unknown>;
 // OPTIMIZATION: Simple cache to avoid re-parsing the same versioned paths
 // In a real scenario with repeated builds, this prevents redundant regex matching
 const versionedPathCache = new Map();
 
-function parseVersionedPath(sourceFilePath) {
+function parseVersionedPath(sourceFilePath: string) {
   // Check cache first
   if (versionedPathCache.has(sourceFilePath)) {
     return versionedPathCache.get(sourceFilePath);
